@@ -27,6 +27,7 @@ module Bio
           'fastq-dump',
           local_path
         ]
+
         Bio::Command.call_command_open3(command) do |stdin, stdout, stderr|
           err = stderr.read
           raise err if err != ''

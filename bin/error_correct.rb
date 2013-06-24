@@ -3,7 +3,7 @@
 require 'optparse'
 require 'bio-logger'
 require 'progressbar'
-require 'parallel'
+#require 'parallel'
 
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__),'..','lib'))
 require 'sra_16S_scripts'
@@ -46,7 +46,7 @@ o = OptionParser.new do |opts|
   opts.on("--logger filename",String,"Log to file [default #{options[:logger]}]") { |name| options[:logger] = name}
   opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG"){|s| options[:log_level] = s}
 end; o.parse!
-if ARGV.length != 0 or options[:out_directory].nil? or options[:sralites_list].nil?
+if ARGV.length > 1
   $stderr.puts o
   exit 1
 end
@@ -59,17 +59,20 @@ if options[:sralites_list]
   log.debug "Reading SRA lite files from #{options[:sralites_list]}"
   sralites = File.open(options[:sralites_list]).readlines.collect{|l| l.strip}
   log.info "Found #{sralites.length} SRA lite files in #{options[:sralites_list]}"
-elsif options[:in_directory]
-  log.debug "Inspecting #{options[:in_directory]}"
-  sralites = Dir.entries(options[:in_directory]).select{|s| s.match(/\.lite\.sra$/)}
-  log.info "Found #{sralites.length} SRA lite files in #{options[:in_directory]}"
+elsif ARGV.length == 1
+  sralites = [ARGV[0]]
+else
+  $stderr.puts o
+  exit 1
 end
 
-# Setup progress bar
-progress = ProgressBar.new('sralite-acacia', sralites.length)
+# Setup progress bar if required
+do_progress = !options[:sralites_list].nil?
+progress = ProgressBar.new('sralite-acacia', sralites.length) if do_progress
 
 # For each input file,
 #Parallel.each(sralites, :in_threads => options[:num_threads]) do |sralite|
+#require 'peach'
 #sralites.peach(options[:num_threads]) do |sralite|
 sralites.each do |sralite|  # convert to a fastq file in a temporary directory
   lite_path = sralite
@@ -123,14 +126,14 @@ sralites.each do |sralite|  # convert to a fastq file in a temporary directory
         raise err if err != ''
       end
 
-      progress.inc
+      progress.inc if do_progress
     end
   rescue Exception => e #if fastq-dump fails
     log.error "Something went wrong while executing acacia on #{sralite}, skipping: #{e}"
     next
   end
 end
-progress.finish
+progress.finish if do_progress
 
 
 
