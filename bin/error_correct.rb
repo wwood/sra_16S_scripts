@@ -4,36 +4,33 @@ require 'optparse'
 require 'bio-logger'
 require 'progressbar'
 require 'parallel'
-require 'peach'
 
-$LOAD_PATH.unshift(File.join([ENV['HOME'],%w(git bioruby-sra_fastq_dumper lib)].flatten))
-require 'bio-sra_fastq_dumper'
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__),'..','lib'))
+require 'sra_16S_scripts'
 
 SCRIPT_NAME = File.basename(__FILE__); LOG_NAME = SCRIPT_NAME.gsub('.rb','')
 
 # Parse command line options into the options hash
 options = {
-  :logger => 'stdout',
-  :acacia_jar => '/srv/whitlam/bio/apps/sw/acacia/1.51-beta/acacia-1.51.b02.jar', #'/srv/whitlam/bio/apps/sw/acacia/1.51-beta/acacia-1.51.b0.jar', #/srv/whitlam/home/projects/DATA_MODELLING/acacia-1.50.b05.jar',
+  :logger => 'stderr',
+  :log_level => 'info',
+  :acacia_jar => '/srv/whitlam/bio/apps/12.04/sw/acacia/1.52/acacia.jar',
   :num_threads => 1,
   :max_file_size => 1024*1024*10, #default to 10MB maximum
 }
 o = OptionParser.new do |opts|
   opts.banner = "
     Usage: #{SCRIPT_NAME} <arguments>
-    
+
     Take a directory of .lite.sra files, and correct them using acacia, outputing the results in a second directory filled with directories (one for each sra lite file) \n\n"
 
-  opts.on("-i", "--input-directory DIRECTORY", "a directory full of SRA .lite.sra files [required (or -f)]") do |arg|
-    options[:in_directory] = File.absolute_path(arg)
-  end
-  opts.on("-f", "--sralite-list-file FILE", "a directory to put output files in [required (or -i)]") do |arg|
+  opts.on("-f", "--sra-list-file FILE", "a file containing a list of files to be processed [required (or -i)]") do |arg|
     options[:sralites_list] = File.absolute_path(arg)
   end
   opts.on("-o", "--output-directory DIRECTORY", "a directory to put output files in [required]") do |arg|
     options[:out_directory] = File.absolute_path(arg)
   end
-  
+
   opts.on("-p", "--parallel-threads NUM_THREADS", "How many threads to split things into (1 thread per acacia run) [default #{options[:num_threads]}]") do |arg|
     options[:num_threads] = arg.to_i
   end
@@ -43,25 +40,18 @@ o = OptionParser.new do |opts|
   opts.on("-a", "--acacia-jar ACACIA_JAR_PATH", "Use a non-standard acacia version [default #{options[:acacia_jar]}]") do |arg|
     options[:acacia_jar] = arg
   end
-  
-  # logger options
-  opts.on("-q", "--quiet", "Run quietly, set logging to ERROR level [default INFO]") do |q|
-    Bio::Log::CLI.trace('error')
-  end
-  opts.on("--logger filename",String,"Log to file [default #{options[:logger]}]") do | name |
-    options[:logger] = name
-  end
-  opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG") do | s |
-    Bio::Log::CLI.trace(s)
-  end
-end
-o.parse!
-if ARGV.length != 0 or options[:out_directory].nil? or (options[:in_directory].nil? and options[:sralites_list].nil?)
+
+  opts.separator "\nVerbosity:\n\n"
+  opts.on("-q", "--quiet", "Run quietly, set logging to ERROR level [default INFO]") {options[:log_level] = 'error'}
+  opts.on("--logger filename",String,"Log to file [default #{options[:logger]}]") { |name| options[:logger] = name}
+  opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG"){|s| options[:log_level] = s}
+end; o.parse!
+if ARGV.length != 0 or options[:out_directory].nil? or options[:sralites_list].nil?
   $stderr.puts o
   exit 1
 end
 # Setup logging. bio-logger defaults to STDERR not STDOUT, I disagree
-Bio::Log::CLI.logger(options[:logger]); log = Bio::Log::LoggerPlus.new(LOG_NAME); Bio::Log::CLI.configure(LOG_NAME)
+Bio::Log::CLI.logger(options[:logger]); Bio::Log::CLI.trace(options[:log_level]); log = Bio::Log::LoggerPlus.new(LOG_NAME); Bio::Log::CLI.configure(LOG_NAME)
 
 
 # Collect a list of the input sra lite files to process, advise
@@ -86,20 +76,20 @@ sralites.each do |sralite|  # convert to a fastq file in a temporary directory
   if options[:in_directory]
     lite_path = File.join options[:in_directory], sralite
   end
-  
+
   # Ensure that the file actually exists
   unless File.exist?(sralite)
     log.error "Unable to find file #{sralite}, skipping"
     next
   end
-  
+
   # Ensure that the file is not larger than the maximum allowable size
   size = File.size(sralite)
   if options[:max_file_size] < size
     log.info "Skipping SRA file #{sralite} because it is too big (#{size} vs. max #{options[:max_file_size]})"
     next
   end
-  
+
     # mkdir and cd to an aptly named direct in the output folder
   outdir = File.join(options[:out_directory], File.basename(sralite))
   if File.exist?(outdir)
@@ -108,13 +98,13 @@ sralites.each do |sralite|  # convert to a fastq file in a temporary directory
   end
   log.debug "Creating directory #{outdir}"
   Dir.mkdir outdir
-  
+
   # convert to a fastq file in a temporary directory
   begin
     Bio::FastqDumper.dump_in_tmpdir(lite_path) do |fastq|
       # Dir.chdir options[:in_directory] #acacia cannot handle the fastq file not being in the current directory, I think
       log.debug "In temporary directory '#{Dir.getwd}'"
-      
+
       # Run acacia and output the files into the working directory
       acacia_command = [
         'java',
@@ -132,7 +122,7 @@ sralites.each do |sralite|  # convert to a fastq file in a temporary directory
         err = stderr.read
         raise err if err != ''
       end
-      
+
       progress.inc
     end
   rescue Exception => e #if fastq-dump fails
