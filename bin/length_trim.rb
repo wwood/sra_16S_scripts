@@ -20,7 +20,7 @@ o = OptionParser.new do |opts|
     Trim reads to the given length, discard them if they are not at least that given length. Output the trimmed reads as FASTA on stdout\n\n"
 
   opts.on("-l", "--length-cutoff LENGTH_IN_BASE_PAIRS", "Length to trim to [required]") do |arg|
-    options[:length_cutoff] = arg
+    options[:length_cutoff] = arg.to_i
   end
   opts.on("--input-type TYPE", "Type of data being processed (fasta or fastq) [default: #{options[:input_type]}]") do |arg|
     raise "Unexpected --input-type #{arg}" unless %w(fasta fastq).include?(arg)
@@ -56,9 +56,12 @@ if options[:input_type] == 'fastq'
   end
 elsif options[:input_type] == 'fasta'
   Bio::FlatFile.foreach(ARGF) do |seq|
-    if seq.se.length >= options[:length_cutoff]
+    if seq.seq.length >= options[:length_cutoff]
+      num_sufficient_length += 1
       puts ">#{seq.definition}"
       puts seq.seq[0...options[:length_cutoff]]
+    else
+      num_insufficient_length += 1
     end
   end
 end
