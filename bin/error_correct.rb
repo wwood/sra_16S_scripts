@@ -17,6 +17,7 @@ options = {
   :acacia_jar => '/srv/whitlam/bio/apps/12.04/sw/acacia/1.52/acacia.jar',
   :num_threads => 1,
   :max_file_size => 1024*1024*10, #default to 10MB maximum
+  :trim_length => 250,
 }
 o = OptionParser.new do |opts|
   opts.banner = "
@@ -40,13 +41,16 @@ o = OptionParser.new do |opts|
   opts.on("-a", "--acacia-jar ACACIA_JAR_PATH", "Use a non-standard acacia version [default #{options[:acacia_jar]}]") do |arg|
     options[:acacia_jar] = arg
   end
+  opts.on("-l", "--trim-length LENGTH", "Ask acacia to trim to this length [default #{options[:trim_length]}]") do |arg|
+    options[:trim_length] = arg.to_i
+  end
 
   opts.separator "\nVerbosity:\n\n"
   opts.on("-q", "--quiet", "Run quietly, set logging to ERROR level [default INFO]") {options[:log_level] = 'error'}
   opts.on("--logger filename",String,"Log to file [default #{options[:logger]}]") { |name| options[:logger] = name}
   opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG"){|s| options[:log_level] = s}
 end; o.parse!
-if ARGV.length > 1
+if ARGV.length > 1 or options[:out_directory].nil?
   $stderr.puts o
   exit 1
 end
@@ -116,7 +120,8 @@ sralites.each do |sralite|  # convert to a fastq file in a temporary directory
         %w(-DFASTA=FALSE -DFASTQ=TRUE),
         "-DOUTPUT_DIR=#{outdir}",
         %w(-DOUTPUT_PREFIX=acacia -DMID_FILE=null),
-        "-DFASTQ_LOCATION=#{fastq}"
+        "-DFASTQ_LOCATION=#{fastq}",
+        "-DTRIM_TO_LENGTH=#{options[:trim_length]}",
       ].flatten
       log.debug "Running acacia with '#{acacia_command}'"
       Bio::Command.call_command_open3(acacia_command) do |stdin, stdout, stderr|
