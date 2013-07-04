@@ -18,12 +18,18 @@ options = {
 }
 o = OptionParser.new do |opts|
   opts.banner = "
-    Usage: #{SCRIPT_NAME} <arguments>
+    Usage: #{SCRIPT_NAME} -s <sam_to_munge.sam> -t <taxonomy_file> -r <reference_fasta>
 
-    Description of what this program does...\n\n"
+    Take a sam file, and add taxonomy and percent identity info\n\n"
 
-  opts.on("-e", "--eg ARG", "description [default: #{options[:eg]}]") do |arg|
-    options[:example] = arg
+  opts.on("-s", "--sam SAM_TO_MUNGE", "sam file to work on [required]") do |arg|
+    options[:sam_file] = arg
+  end
+  opts.on("-t", "--taxonomy TAX_FILE", "taxonomy file, header'd list of tab separate ID+taxonomy info [required]") do |arg|
+    options[:taxonomy_file] = arg
+  end
+  opts.on("-r", "--reference REF_FASTA", "fasta file of sequences that the sam was mapped to [required]") do |arg|
+    options[:reference_fasta] = arg
   end
 
   # logger options
@@ -32,7 +38,7 @@ o = OptionParser.new do |opts|
   opts.on("--logger filename",String,"Log to file [default #{options[:logger]}]") { |name| options[:logger] = name}
   opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG"){|s| options[:log_level] = s}
 end; o.parse!
-if ARGV.length != 0
+if ARGV.length != 0 or options[:reference_fasta].nil? or options[:taxonomy_file].nil? or options[:sam_file].nil?
   $stderr.puts o
   exit 1
 end
@@ -46,6 +52,7 @@ CSV.foreach(options[:taxonomy_file], :col_sep => "\t", :header => true) do |row|
   raise "Unexpected taxonomy file line: #{row.inspect}" unless row.length == 2
   raise "Duplicate taxon id: #{row[0]}" if taxonomy.key?(row[0])
   taxonomies[row[0]] = row[1]
+  break if taxonomies.length > 100
 end
 log.info "Finished reading #{taxonomies.length} taxonomy entries"
 
