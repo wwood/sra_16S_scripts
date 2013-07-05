@@ -17,6 +17,17 @@ module Bio
         self.seq   = s[9]
         self.qual =  s[10]
       end
+
+  # Work out the percent identity given of the query sequence
+    # against the reference sequence, using the CIGAR string as
+      # the alignment
+        def percent_identity(reference_sequence)
+            return Bio::Cigar.new(self.cigar).percent_identity(
+                  reference_sequence[self.pos-1...reference_sequence.length],
+                        self.seq
+                            )
+                              end
+
     end
 
     class AlignmentSet < Array
@@ -34,8 +45,8 @@ module Bio
         if last_alignment_name != aln.qname
           unless current_set.nil?
             yield current_set
-            current_set = AlignmentSet.new
           end
+          current_set = AlignmentSet.new
         end
         current_set.push aln
       end

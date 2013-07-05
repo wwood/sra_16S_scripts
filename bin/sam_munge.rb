@@ -48,11 +48,11 @@ Bio::Log::CLI.logger(options[:logger]); Bio::Log::CLI.trace(options[:log_level])
 # Read in the taxonomy file into a hash
 log.info "Reading taxonomy file.."
 taxonomies = {}
-CSV.foreach(options[:taxonomy_file], :col_sep => "\t", :header => true) do |row|
+CSV.foreach(options[:taxonomy_file], :col_sep => "\t", :headers => true) do |row|
   raise "Unexpected taxonomy file line: #{row.inspect}" unless row.length == 2
-  raise "Duplicate taxon id: #{row[0]}" if taxonomy.key?(row[0])
+  raise "Duplicate taxon id: #{row[0]}" if taxonomies.key?(row[0])
   taxonomies[row[0]] = row[1]
-  break if taxonomies.length > 100
+  #break if taxonomies.length > 100
 end
 log.info "Finished reading #{taxonomies.length} taxonomy entries"
 
@@ -60,6 +60,7 @@ log.info "Reading the reference sequences file.."
 reference_sequences = {}
 Bio::FlatFile.foreach(options[:reference_fasta]) do |seq|
   reference_sequences[seq.definition.split(/\s/)[0]] = seq.seq
+  #break if reference_sequences.length > 100
 end
 log.info "Finished reading #{reference_sequences.length} sequences"
 
@@ -69,25 +70,32 @@ log.info "Finished reading #{reference_sequences.length} sequences"
 num_chimeras = 0
 num_alns = 0
 log.debug "Reading through sam file.."
-Bio::SamIterator.new(File.open options[:sam_file]).each_alignment do |alns|
+Bio::SamIterator.new(File.open options[:sam_file]).each_alignment_set do |alns|
   # ignore if there is 2 or more from the same pyrotag, as these are likely chimeric pyrotags
   if alns.length > 1
     num_chimeras += 1
 
   # print out the read name, hit ID, percent identity, taxonomy
+  elsif alns[0].rname == '*'
+    puts [
+      alns[0].qname,
+      '-'
+    ].join "\t"
   else
-    p aln
-    alns = aln
+    aln = alns[0]
     cigar = Bio::Cigar.new aln.cigar
     ref = reference_sequences[aln.rname]
     raise "Could not find reference sequence for #{aln.rname}!" if ref.nil?
-    identity = cigar.percent_identity(ref, aln.seq)
-    tax = taxonomies[aln.rname]
+    identity, pos, neg = aln.percent_identity(ref)
+    tax =  taxonomies[aln.rname]
     raise "Could not find taxonomy for #{aln.rname}" if tax.nil?
     puts [
       aln.qname,
       aln.rname,
-      percent_identity,
+      identity,
+      #pos,
+      #neg,
+      aln.cigar,
       tax
     ].join "\t"
     num_alns += 1
