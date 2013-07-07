@@ -7,6 +7,7 @@ gem 'reachable'
 gem 'bio'
 gem 'bio-faster', '>= 0.4.5'
 gem 'bio-cd-hit-report'
+gem 'systemu'
 
 # Add dependencies to develop your gem here.
 # Include everything needed to run rake, tests, features, etc.

@@ -56,7 +56,7 @@ module Bio
       nil
     end
 
-    alias_method :each_alignment_set, :each
+    alias_method :each, :each_alignment_set
     include Enumerable
   end
 end
