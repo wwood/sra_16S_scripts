@@ -67,22 +67,17 @@ log.info "Finished reading #{reference_sequences.length} sequences"
 
 # Go through the sam file
 #Foreach alignment from the sam file
-num_chimeras = 0
 num_alns = 0
 log.debug "Reading through sam file.."
 Bio::SamIterator.new(File.open options[:sam_file]).each_alignment_set do |alns|
-  # ignore if there is 2 or more from the same pyrotag, as these are likely chimeric pyrotags
-  if alns.length > 1
-    num_chimeras += 1
-
   # print out the read name, hit ID, percent identity, taxonomy
-  elsif alns[0].rname == '*'
+  if alns[0].rname == '*'
     puts [
       alns[0].qname,
       ['-']*7
     ].flatten.join "\t"
   else
-    aln = alns[0]
+    aln = alns[0] #Always take the best hit
     cigar = Bio::Cigar.new aln.cigar
     ref = reference_sequences[aln.rname]
     raise "Could not find reference sequence for #{aln.rname}!" if ref.nil?
@@ -102,4 +97,4 @@ Bio::SamIterator.new(File.open options[:sam_file]).each_alignment_set do |alns|
     num_alns += 1
   end
 end
-log.info "Finished writing #{num_alns} alignments, ignored #{num_chimeras} chimeras"
+log.info "Finished writing #{num_alns} alignments"
