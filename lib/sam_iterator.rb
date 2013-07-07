@@ -49,11 +49,15 @@ module Bio
           current_set = AlignmentSet.new
         end
         current_set.push aln
+        last_alignment_name = aln.qname
       end
       # yield the last set, if there is one
       yield current_set unless current_set.nil?
       nil
     end
+
+    alias_method :each_alignment_set, :each
+    include Enumerable
   end
 end
 
