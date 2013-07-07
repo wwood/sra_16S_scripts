@@ -79,8 +79,8 @@ Bio::SamIterator.new(File.open options[:sam_file]).each_alignment_set do |alns|
   elsif alns[0].rname == '*'
     puts [
       alns[0].qname,
-      '-'
-    ].join "\t"
+      ['-']*7
+    ].flatten.join "\t"
   else
     aln = alns[0]
     cigar = Bio::Cigar.new aln.cigar
@@ -93,10 +93,11 @@ Bio::SamIterator.new(File.open options[:sam_file]).each_alignment_set do |alns|
       aln.qname,
       aln.rname,
       identity,
-      #pos,
+      pos+neg,
       #neg,
       aln.cigar,
-      tax
+      tax,
+      aln.seq,
     ].join "\t"
     num_alns += 1
   end
